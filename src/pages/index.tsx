@@ -1,115 +1,249 @@
-import Image from "next/image";
-import localFont from "next/font/local";
+import Link from 'next/link';
+import React, { useEffect, useState } from 'react';
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-});
+export interface User {
+  id: number;
+  username?: string;
+  email?: string;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+}
 
 export default function Home() {
-  return (
-    <div
-      className={`${geistSans.variable} ${geistMono.variable} grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]`}
-    >
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/pages/index.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [users, setUsers] = useState<User[]>([]); // Define state variable 'users' as an array of User objects
+  const [showConfirm, setShowConfirm] = useState(false); // Define state variable 'showConfirm' as a boolean
+  const [showUpdate, setShowUpdate] = useState(false); // Define state variable 'showUpdate' as a boolean
+  const [userIdToDelete, setUserIdToDelete] = useState<number | null>(null); // Define state variable 'userIdToDelete' as a number or null
+  const [userToUpdate, setUserToUpdate] = useState<User | null>(null); // Define state variable 'userToUpdate' as a User object or null
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Fetch users from the API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch('/api/usersGet'); // Send a GET request to the '/api/usersGet' endpoint
+        const { data } = await response.json(); // Parse the response JSON and extract the 'data' property
+
+        if (Array.isArray(data)) {
+          setUsers(
+            data.map((user: User) => ({
+              ...user,
+              createdAt: user.createdAt ? new Date(user.createdAt) : null,
+              updatedAt: user.updatedAt ? new Date(user.updatedAt) : null,
+            }))
+          ); // If the 'data' is an array, update the 'users' state with the mapped array of User objects
+        } else {
+          console.error('Data received is not an array:', data); // Log an error message if the 'data' is not an array
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error); // Log an error message if there is an error fetching users
+      }
+    };
+
+    fetchUsers(); // Call the fetchUsers function when the component mounts
+  }, []);
+
+  // Handle user deletion
+  const handleDeleteUser = async () => {
+    if (userIdToDelete === null) return; // If 'userIdToDelete' is null, return
+
+    try {
+      await fetch(`/api/users/${userIdToDelete}`, {
+        method: 'DELETE', // Send a DELETE request to the '/api/users/{userIdToDelete}' endpoint
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      setUsers(users.filter((user) => user.id !== userIdToDelete)); // Update the 'users' state by filtering out the user with 'userIdToDelete'
+      setShowConfirm(false); // Set 'showConfirm' state to false
+    } catch (error) {
+      console.error('Error deleting user:', error); // Log an error message if there is an error deleting the user
+    }
+  };
+
+  // Handle user update
+  const handleUpdateUser = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); // Prevent the default form submission behavior
+    if (!userToUpdate) return; // If 'userToUpdate' is null, return
+
+    try {
+      const response = await fetch(`/api/users/${userToUpdate.id}`, {
+        method: 'PUT', // Send a PUT request to the '/api/users/{userToUpdate.id}' endpoint
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: userToUpdate.username,
+          email: userToUpdate.email,
+        }), // Send the updated username and email in the request body
+      });
+
+      const updatedUser = await response.json(); // Parse the response JSON and assign it to 'updatedUser'
+
+      // Update the local state with the updated user
+      setUsers(
+        users.map((user) =>
+          user.id === updatedUser.data.id ? updatedUser.data : user
+        )
+      );
+      setShowUpdate(false); // Set 'showUpdate' state to false
+    } catch (error) {
+      console.error('Error updating user:', error); // Log an error message if there is an error updating the user
+    }
+  };
+
+  const confirmDeleteUser = (id: number) => {
+    setUserIdToDelete(id); // Set 'userIdToDelete' state to the provided id
+    setShowConfirm(true); // Set 'showConfirm' state to true
+  };
+
+  const openUpdateModal = (user: User) => {
+    setUserToUpdate(user); // Set 'userToUpdate' state to the provided user
+    setShowUpdate(true); // Set 'showUpdate' state to true
+  };
+
+  return (
+    <main className="p-6 bg-gray-100 min-h-screen">
+      <title>User List Dasboard</title>
+      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-6">
+        <div className="flex">
+          <h2 className="text-xl font-semibold mb-4">User List</h2>
+          <button className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded-lg createUser">
+            <Link href="/createusers">Create User</Link>
+          </button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        {users.length === 0 ? (
+          <p>No users found.</p>
+        ) : (
+          <table className="min-w-full border-collapse border border-gray-300">
+            <thead>
+              <tr className="bg-gray-200">
+                <th className="border border-gray-300 px-4 py-2 text-left">
+                  Username
+                </th>
+                <th className="border border-gray-300 px-4 py-2 text-left">
+                  Email
+                </th>
+                <th className="border border-gray-300 px-4 py-2 text-left">
+                  Create Date
+                </th>
+                <th className="border border-gray-300 px-4 py-2 text-left">
+                  Update Date
+                </th>
+                <th className="border border-gray-300 px-4 py-2 text-left">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id} className="hover:bg-gray-100">
+                  <td className="border border-gray-300 px-4 py-2">
+                    {user.username}
+                  </td>
+                  <td className="border border-gray-300 px-4 py-2">
+                    {user.email}
+                  </td>
+                  <td className="border border-gray-300 px-4 py-2">
+                    {user.createdAt?.toLocaleString()}
+                  </td>
+                  <td className="border border-gray-300 px-4 py-2">
+                    {user.updatedAt?.toLocaleString()}
+                  </td>
+                  <td className="border border-gray-300 px-4 py-2">
+                    <button
+                      onClick={() => openUpdateModal(user)}
+                      className="bg-blue-500 text-white rounded-lg px-2 py-1 hover:bg-blue-600 mr-2"
+                    >
+                      Update
+                    </button>
+                    <button
+                      onClick={() => confirmDeleteUser(user.id)}
+                      className="bg-red-500 text-white rounded-lg px-2 py-1 hover:bg-red-600"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Modal Konfirmasi Hapus */}
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white rounded-lg p-6 shadow-lg">
+            <h3 className="text-lg font-semibold mb-4">Konfirmasi Hapus</h3>
+            <p>Apakah Anda yakin ingin menghapus pengguna ini?</p>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="bg-gray-300 text-black rounded-lg px-4 py-2 mr-2"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                className="bg-red-500 text-white rounded-lg px-4 py-2"
+              >
+                Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Pembaruan Pengguna */}
+      {showUpdate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="bg-white rounded-lg p-6 shadow-lg">
+            <h3 className="text-lg font-semibold mb-4">Update User</h3>
+            <form onSubmit={handleUpdateUser}>
+              <div className="mb-4">
+                <label className="block mb-2">Username</label>
+                <input
+                  type="text"
+                  value={userToUpdate?.username || ''}
+                  onChange={(e) =>
+                    setUserToUpdate({
+                      ...userToUpdate!,
+                      username: e.target.value,
+                    })
+                  }
+                  className="border border-gray-300 rounded-lg px-4 py-2 w-full"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block mb-2">Email</label>
+                <input
+                  type="email"
+                  value={userToUpdate?.email || ''}
+                  onChange={(e) =>
+                    setUserToUpdate({ ...userToUpdate!, email: e.target.value })
+                  }
+                  className="border border-gray-300 rounded-lg px-4 py-2 w-full"
+                />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowUpdate(false)}
+                  className="bg-gray-300 text-black rounded-lg px-4 py-2 mr-2"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="bg-blue-500 text-white rounded-lg px-4 py-2"
+                >
+                  Simpan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }

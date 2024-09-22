@@ -1,0 +1,27 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// Define the generator block for generating the Prisma client
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Define the datasource block for connecting to the MySQL database
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL") // Use the value of the DATABASE_URL environment variable for the database connection
+}
+
+// Define the User model
+model User {
+  id       Int     @default(autoincrement()) @id // Define the id field as an auto-incrementing integer and the primary key
+  username String  @db.VarChar(255) // Define the username field as a string with a maximum length of 255 characters
+  email    String  @unique @db.VarChar(255) // Define the email field as a unique string with a maximum length of 255 characters
+  password String  @db.VarChar(255) // Define the password field as a string with a maximum length of 255 characters
+  createdAt DateTime @default(now()) // Define the createdAt field as a datetime field with a default value of the current timestamp
+  updatedAt DateTime @updatedAt // Define the updatedAt field as a datetime field that automatically updates on each update
+  @@map("users") // Map the model to the "users" table in the database
+}
